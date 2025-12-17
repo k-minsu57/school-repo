@@ -111,7 +111,7 @@ def train_evaluate_and_predict(df):
     train_df = df_clean.iloc[:split_idx]  # train
     test_df = df_clean.iloc[split_idx:]   # test
     
-    X_train = train_df[['Drag_term']]
+    X_train = train_df[['Drag_term', 'F10.7_OBS', 'AP_AVG']]
     y_train = train_df['decay_rate']
     
     ### 선형 회귀 학습
@@ -132,16 +132,31 @@ def train_evaluate_and_predict(df):
     end_date = test_df['EPOCH'].max() + pd.Timedelta(days=10)
 
     while last_epoch < end_date:
-        # 현재 상태 계산 (밀도, 속도)
+        # 1. 현재 상태 계산 (물리적 항력 항)
         curr_r = EARTH_RADIUS + current_alt
         curr_density = calculate_density(current_alt)
-        curr_velocity_sq = MU / curr_r # 중력 효과 반영
+        curr_velocity_sq = MU / curr_r 
         
-        # 탄도 계수 포함한 항 계산
         curr_physics_term = curr_density * curr_velocity_sq * (INPUT_AREA / INPUT_MASS)
         
+        # 날짜에 맞는 Space Weather 데이터 찾아오기
+        
+        # 현재 날짜 이후의 데이터 중 가장 첫 번째 것을 가져옴 (Nearest lookup)
+        future_data = df[df['EPOCH'] >= last_epoch]
+        
+        if not future_data.empty:
+            # 데이터가 있으면 그 날짜의 기상 정보를 씀
+            curr_f107 = future_data.iloc[0]['F10.7_OBS']
+            curr_ap = future_data.iloc[0]['AP_AVG']
+        else:
+            # 시뮬레이션이 데이터 범위를 넘어가면, 갖고 있는 데이터 중 가장 마지막 값을 씀
+            curr_f107 = df['F10.7_OBS'].iloc[-1]
+            curr_ap = df['AP_AVG'].iloc[-1]
+
         # 모델 예측
-        input_df = pd.DataFrame([[curr_physics_term]], columns=['Drag_term'])
+        input_data = [[curr_physics_term, curr_f107, curr_ap]]
+        input_df = pd.DataFrame(input_data, columns=['Drag_term', 'F10.7_OBS', 'AP_AVG'])
+        
         pred_rate = model.predict(input_df)[0]
         
         # 상태 업데이트
@@ -149,11 +164,9 @@ def train_evaluate_and_predict(df):
         current_alt -= drop_amount
         last_epoch += pd.Timedelta(days=step_days)
         
-        # 기록
         sim_epochs.append(last_epoch)
         sim_alts.append(current_alt)
         
-        # 추락(100km 이하) 시 종료
         if current_alt < 100:
             print(f"   -> 예측된 추락 시점: {last_epoch}")
             break
