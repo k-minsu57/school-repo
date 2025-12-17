@@ -47,7 +47,7 @@ def load_and_process():
         has_sw = False
 
     # 고도(Altitude) 계산
-    # 공식: Altitude = (mu / n^2)^(1/3) - R_earth
+    # 공식: Altitude = (mu / n^2)^(1/3) - R_earth : Gemini에게 TLE 정보를 바탕으로 고도를 계산하는 공식과 코드를 요청하여 받았습니다.
     df_tle['n_rad_s'] = df_tle['MEAN_MOTION'] * (2 * np.pi / 86400)
     df_tle['semi_major_axis_km'] = (MU / (df_tle['n_rad_s'] ** 2)) ** (1/3)
     df_tle['Altitude'] = df_tle['semi_major_axis_km'] - EARTH_RADIUS
@@ -55,7 +55,7 @@ def load_and_process():
     # TLE 데이터 날짜 문자열을 datatime 객체로 변환
     df_tle['EPOCH'] = pd.to_datetime(df_tle['EPOCH'])
     
-    # Space weather 데이터 병합
+    # Space weather 데이터 병합 : TLE 정보와 Space weather의 date가 일치하지 않는 문제를 해결할 방법을 Gemini에게 물어 얻은 코드입니다.
     if has_sw:
         df_tle['date_short'] = df_tle['EPOCH'].dt.strftime('%Y-%m-%d')
         df_sw['DATE'] = pd.to_datetime(df_sw['DATE']).dt.strftime('%Y-%m-%d')
@@ -172,7 +172,7 @@ def train_evaluate_and_predict(df):
     # 예측된 시간 계산을 위한 변수 초기화
     pred_arrival_time = None
     
-    # 예측이 해당 고도(target_alt)에 도달했는지 확인
+    # 예측이 해당 고도(target_alt)에 도달했는지 확인 : 둘 중 더 낮은 최종 고도에서 성능 검사를 할 수 있도록 코드를 보완하는 과정에서 Gemini의 도움을 받았습니다.
     if sim_alts_arr[-1] <= target_alt:
         # 도달함: 시뮬레이션 데이터에서 target_alt일 때의 시간을 보간(Interpolation)으로 찾음
         
